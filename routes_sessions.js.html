@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>routes/sessions.js - Documentation</title>
+
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav>
+    <li class="nav-link nav-home-link"><a href="index.html">Home</a></li><li class="nav-heading">Modules</li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-routes_index.html">routes/index</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-routes_issuesDel.html">routes/issuesDel</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-routes_issuesGet.html">routes/issuesGet</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-routes_issuesPost.html">routes/issuesPost</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-routes_issuesPut.html">routes/issuesPut</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-routes_labels.html">routes/labels</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-routes_session.html">routes/session</a></span></li><li class="nav-heading"><span class="nav-item-type type-module">M</span><span class="nav-item-name"><a href="module-routes_users.html">routes/users</a></span></li><li class="nav-heading"><a href="global.html">Globals</a></li><li class="nav-item"><span class="nav-item-type type-member">M</span><span class="nav-item-name"><a href="global.html#index">index</a></span></li>
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">routes/sessions.js</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/** 
+ * Express router providing session related routes
+ * @module routes/session
+ * @requires express
+ * @requires models/user
+ * @requires utils/rateLimiter
+ * @see module:models/user
+ * @see module:utils/rateLimiter
+ */
+
+let express = require('express');
+let User = require('../models/user');
+let rateLimiter = require('../utils/rateLimiter.js');
+let router = express.Router();
+
+/**
+ * Route serving login form
+ * @name Get login form
+ * @route {GET} /sessions/new
+ */
+router.get('/new', (req, res, next) => {
+	res.render('login', {title: 'Enter you credentials'});
+});
+
+/**
+ * Route for sending credentials
+ * @name Log in
+ * @route {POST} /sessions
+ * @bodyparam {string} email User provided email address
+ * @bodyparam {string} password User provided password
+ */
+router.post('/', rateLimiter, (req, res, next) => {
+	if (req.session.email) return res.status(400).send({message: 'You are already logged in.'});
+	next();
+});
+
+router.post('/', async (req, res, next) => {
+	try {
+		let foundUser = await User.findOne({email: req.body.email}).exec();
+		if (!foundUser) return res.status(403).send({message: 'You do not have an active account.'});
+		req.foundUser = foundUser;
+		next();
+	} catch (err) {
+		next({error: 'Internal server error. Try to log in again.'});
+	}
+});
+
+router.post('/', async (req, res, next) => {
+	let user = req.foundUser;
+	let isValid = await user.isPasswordValid(req.body.password, user.password);
+
+	if (isValid) {
+		req.session.email = user.email;
+		res.status(201).send({
+			id: user.id,
+			username: user.firstName + ' ' + user.lastName,
+			message: 'Successfully logged in.'
+		});
+	} else {
+		res.status(401).send({message: 'You have entered the wrong password.'});
+	}
+});
+
+/**
+ * Route for removing credentials
+ * @name Log out
+ * @route {DELETE} /sessions
+ * @authentication This route requires active session cookie
+ */
+router.delete('/', (req, res, next) => {
+	if (!('email' in req.session)) return res.status(400).send({message: 'You are not currently logged in.'});
+	next();
+});
+
+router.delete('/', (req, res, next) => {
+	res.clearCookie('sessionCookie');
+	req.session.destroy(err => {
+		if (err) {
+			next({error: 'Internal server error. Try to log out again.'});
+		}
+		res.status(200).send({message: 'You have been successfully logged out.'});
+	});
+});
+
+module.exports = router;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<br class="clear">
+
+<footer>
+    Generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.5.5</a> on Thu Mar 22 2018 08:46:59 GMT+0100 (CET) using the Minami theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/linenumber.js"></script>
+</body>
+</html>
